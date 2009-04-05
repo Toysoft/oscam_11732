@@ -174,7 +174,7 @@ cross-sh4-linux:
 cross-i386-pc-cygwin:
 	@-$(MAKE) --no-print-directory \
 		-f Maketype TYP=$(subst cross-,,$@) \
-		OS_LIBS="-lcrypto" \
+		OS_LIBS="" \
 		OS_CULI="-lncurses" \
 		OS_PTLI="-lpthread" \
 		DS_OPTS="-O2 -DOS_CYGWIN32" \
@@ -195,7 +195,7 @@ cross-i386-pc-cygwin:
 i386-pc-cygwin:
 	@-$(MAKE) --no-print-directory \
 		-f Maketype TYP=$(subst cross-,,$@) \
-		OS_LIBS="-lcrypto" \
+		OS_LIBS="" \
 		OS_CULI="-lncurses" \
 		OS_PTLI="-lpthread" \
 		DS_OPTS="-O2 -DOS_CYGWIN32 -I /tmp/include" \
@@ -324,7 +324,7 @@ cross-mipsel-router-linux-uclibc928:
 cross-mipsel-tuxbox-linux-glibc:
 	@-$(MAKE) --no-print-directory \
 		-f Maketype TYP=$(subst cross-,,$@) \
-		OS_LIBS="-lcrypto" \
+		OS_LIBS="" \
 		OS_CULI="-lncurses" \
 		OS_PTLI="-lpthread" \
 		DS_OPTS="-O2 -DOS_LINUX -DTUXBOX -DMIPSEL -static-libgcc" \
@@ -336,22 +336,6 @@ cross-mipsel-tuxbox-linux-glibc:
 		DS_LD=mipsel-linux-glibc-ld \
 		DS_RL=mipsel-linux-glibc-ranlib \
 		DS_ST=mipsel-linux-glibc-strip
-
-cross-mipsel-tuxbox-linux:
-	@-$(MAKE) --no-print-directory \
-		-f Maketype TYP=$(subst cross-,,$@) \
-		OS_LIBS="-lcrypto" \
-		OS_CULI="-lncurses" \
-		OS_PTLI="-lpthread" \
-		DS_OPTS="-O2 -DOS_LINUX -DTUXBOX -DMIPSEL -static-libgcc" \
-		DS_CFLAGS="-c" \
-		DS_LDFLAGS="" \
-		DS_ARFLAGS="-rvsl" \
-		DS_CC=mipsel-linux-gcc \
-		DS_AR=mipsel-linux-ar \
-		DS_LD=mipsel-linux-ld \
-		DS_RL=mipsel-linux-ranlib \
-		DS_ST=mipsel-linux-strip
 
 ######################################################################
 #
