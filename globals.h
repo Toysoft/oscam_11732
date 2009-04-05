@@ -27,7 +27,7 @@
 
 #ifndef CS_GLOBALS
 #define CS_GLOBALS
-#define CS_VERSION		"0.99.2"
+#define CS_VERSION		"0.9d"
 
 #if defined(__GNUC__)
 #  define GCC_PACK __attribute__((packed))
@@ -35,9 +35,9 @@
 #  define GCC_PACK
 #endif
 
-#include "oscam-config.h"
-#include "oscam-ostype.h"
-#include "oscam-types.h"
+#include "mpcs-config.h"
+#include "mpcs-ostype.h"
+#include "mpcs-types.h"
 #include "cscrypt/cscrypt.h"
 
 #ifndef CS_CONFDIR
@@ -52,7 +52,6 @@
 #define CS_QLEN			128	// size of request queue
 #define CS_MAXQLEN		128	// size of request queue for cardreader
 #define CS_MAXCAIDTAB		32	// max. caid-defs/user
-#define CS_MAXTUNTAB        4   // max. betatunnel mappings
 #define CS_MAXPROV		32
 #define CS_MAXPORTS		32	// max server ports
 #define CS_MAXFILTERS		16
@@ -181,13 +180,6 @@ typedef	struct s_caidtab
   ushort cmap[CS_MAXCAIDTAB];
 } GCC_PACK CAIDTAB;
 
-typedef struct s_tuntab
-{
-  ushort bt_caidfrom[CS_MAXTUNTAB];
-  ushort bt_caidto[CS_MAXTUNTAB];
-  ushort bt_srvid[CS_MAXTUNTAB];
-} GCC_PACK TUNTAB;
-
 typedef struct s_sidtab
 {
   char     label[33];
@@ -292,7 +284,6 @@ struct s_client
   int       monlvl;
   int       dbglvl;
   CAIDTAB   ctab;
-  TUNTAB    ttab;
   ulong     sidtabok;	// positiv services
   ulong     sidtabno;	// negative services
   int       typ;
@@ -339,8 +330,6 @@ struct s_reader
   char      label[32];
   char      device[128];
   int       detect;
-  int       mhz;
-  int       custom_speed;
   int       r_port;
   char      r_usr[64];
   char      r_pwd[64];
@@ -358,7 +347,6 @@ struct s_reader
   ushort    acs;		// irdeto
   ushort    caid[16];
   uchar     b_nano[256];
-  char      pincode[5];
   int       logemm;
   int       cachemm;
   int       rewritemm;
@@ -431,7 +419,6 @@ struct s_auth
   FTAB     fchid;
   FTAB     ftab;       // user [caid] and ident filter
   CLASSTAB cltab;
-  TUNTAB   ttab;
 #ifdef CS_ANTICASC
   int      ac_idx;
   int      ac_users;   // 0 - unlimited
@@ -439,6 +426,7 @@ struct s_auth
 #endif
   in_addr_t dynip;
   uchar     dyndns[64];
+  int       premhack;
   struct   s_auth *next;
 };
 
@@ -563,7 +551,7 @@ typedef struct emm_packet_t
   int   cidx;
 } GCC_PACK EMM_PACKET;
 
-// oscam-simples
+// mpcs-simples
 extern char *remote_txt(void);
 extern char *trim(char *);
 extern char *strtolower(char *);
@@ -590,7 +578,7 @@ extern int bytes_available(int);
 extern void cs_setpriority(int);
 extern struct s_auth *find_user(char *);
 
-// oscam variables
+// mpcs variables
 extern int pfd, rfd, fd_c2m, fd_m2c, cs_idx, *c_start, cs_ptyp, cs_dblevel, cs_hw;
 extern int *logidx, *loghistidx, *log_fd;
 extern int is_server, *mcl;
@@ -618,7 +606,7 @@ extern int use_ac_log;
 #endif
 
 
-// oscam
+// mpcs
 extern char *cs_platform(char *);
 extern int recv_from_udpipe(uchar *, int);
 extern char* username(int);
@@ -663,10 +651,10 @@ extern void ac_init_client(struct s_auth *);
 extern void ac_chk(ECM_REQUEST*, int);
 #endif
 
-// oscam-nano
+// mpcs-nano
 extern int chk_class(ECM_REQUEST *, CLASSTAB*, const char*, const char*);
 
-// oscam-config
+// mpcs-config
 extern int  init_config(void);
 extern int  init_userdb(void);
 extern int  init_readerdb(void);
@@ -676,14 +664,14 @@ extern int  search_boxkey(ushort, ulong, char *);
 extern void init_len4caid(void);
 extern int  init_irdeto_guess_tab(void);
 
-// oscam-reader
+// mpcs-reader
 extern int ridx, logfd;
 extern void cs_ri_brk(int);
 extern void cs_ri_log(char *,...);
 extern void start_cardreader(void);
 extern void reader_card_info(void);
 
-// oscam-log
+// mpcs-log
 extern int  cs_init_log(char *);
 extern void cs_log(char *,...);
 extern void cs_debug(char *,...);
@@ -693,7 +681,7 @@ extern int  cs_init_statistics(char *);
 extern void cs_statistics(int);
 extern void cs_dump(uchar *, int, char *, ...);
 
-// oscam-aes
+// mpcs-aes
 extern void aes_set_key(char *);
 extern void aes_encrypt_idx(int, uchar *, int);
 extern void aes_decrypt(uchar *, int);
@@ -717,12 +705,6 @@ extern int viaccess_do_ecm(ECM_REQUEST *);
 extern int viaccess_do_emm(EMM_PACKET *);
 extern int viaccess_card_info(void);
 
-// reader-videoguard
-extern int videoguard_card_init(uchar *, int);
-extern int videoguard_do_ecm(ECM_REQUEST *);
-extern int videoguard_do_emm(EMM_PACKET *);
-extern int videoguard_card_info(void);
-
 // reader-cryptoworks
 extern int cryptoworks_card_init(uchar *, int);
 extern int cryptoworks_do_ecm(ECM_REQUEST *);
@@ -743,7 +725,7 @@ extern void module_camd35_tcp(struct s_module *);
 extern void module_camd33(struct s_module *);
 extern void module_newcamd(struct s_module *);
 extern void module_radegast(struct s_module *);
-extern void module_oscam_ser(struct s_module *);
+extern void module_mpcser(struct s_module *);
 extern void module_gbox(struct s_module *);
 extern struct timeval *chk_pending(struct timeb tp_ctimeout);
 #endif	// CS_GLOBALS

@@ -45,10 +45,6 @@
 #include "io_serial.h"
 #include "mc_global.h"
 
-#ifndef OS_CYGWIN32
-#include <linux/serial.h>
-#endif
-
 #define IO_SERIAL_FILENAME_LENGTH 	32
 
 /*
@@ -73,23 +69,20 @@ static void IO_Serial_SetPropertiesCache(IO_Serial * io, IO_Serial_Properties * 
 
 static void IO_Serial_ClearPropertiesCache (IO_Serial * io);
 
-static int _in_echo_read = 0;
-int io_serial_need_dummy_char = 0;
-
 int fdmc=(-1);
 
 #if defined(TUXBOX) && defined(PPC)
 void IO_Serial_Ioctl_Lock(IO_Serial * io, int flag)
 {
-  extern int *oscam_sem;
+  extern int *mpcs_sem;
   if ((io->com!=RTYP_DB2COM1) && (io->com!=RTYP_DB2COM2)) return;
   if (!flag)
-    *oscam_sem=0;
-  else while (*oscam_sem!=io->com)
+    *mpcs_sem=0;
+  else while (*mpcs_sem!=io->com)
   {
-    while (*oscam_sem)
+    while (*mpcs_sem)
     usleep((io->com)*2000);
-    *oscam_sem=io->com;
+    *mpcs_sem=io->com;
     usleep(1000);
   }
 }
@@ -505,54 +498,9 @@ bool IO_Serial_SetProperties (IO_Serial * io, IO_Serial_Properties * props)
 //	printf("IO: Setting properties: com%d, %ld bps; %d bits/byte; %s parity; %d stopbits; dtr=%d; rts=%d\n", io->com, props->input_bitrate, props->bits, props->parity == IO_SERIAL_PARITY_EVEN ? "Even" : props->parity == IO_SERIAL_PARITY_ODD ? "Odd" : "None", props->stopbits, props->dtr, props->rts);
 	memset (&newtio, 0, sizeof (newtio));
 	/* Set the bitrate */
-
-    extern int mhz;
-    extern int reader_irdeto_mode;
-    if (mhz == 600) {
-        /* for 6MHz */
-        if (reader_irdeto_mode) {
-            cfsetospeed(&newtio, IO_Serial_Bitrate(props->output_bitrate));
-            cfsetispeed(&newtio, IO_Serial_Bitrate(props->input_bitrate));
-		} else {
-#ifndef OS_CYGWIN32
-        	struct serial_struct nuts;
-        	ioctl(io->fd, TIOCGSERIAL, &nuts);
-        	nuts.custom_divisor = nuts.baud_base / 9600 * 3.57 / 6;
-        	nuts.flags &= ~ASYNC_SPD_MASK;
-        	nuts.flags |= ASYNC_SPD_CUST;
-        	ioctl(io->fd, TIOCSSERIAL, &nuts);
-	    	cfsetospeed(&newtio, IO_Serial_Bitrate(38400));
-	    	cfsetispeed(&newtio, IO_Serial_Bitrate(38400));
-#else
-	    	cfsetospeed(&newtio, IO_Serial_Bitrate(9600 / 3.57 * 6));
-	    	cfsetispeed(&newtio, IO_Serial_Bitrate(9600 / 3.57 * 6));
-#endif
-		}
-    } else if (mhz == 357 || mhz == 358) {
-        /* for 3.57 MHz */
-        if (reader_irdeto_mode) {
-#ifndef OS_CYGWIN32
-        	struct serial_struct nuts;
-        	ioctl(io->fd, TIOCGSERIAL, &nuts);
-        	nuts.custom_divisor = nuts.baud_base / 5713;
-        	nuts.flags &= ~ASYNC_SPD_MASK;
-        	nuts.flags |= ASYNC_SPD_CUST;
-        	ioctl(io->fd, TIOCSSERIAL, &nuts);
-		    cfsetospeed(&newtio, IO_Serial_Bitrate(38400));
-		    cfsetispeed(&newtio, IO_Serial_Bitrate(38400));
-#else
-	    	cfsetospeed(&newtio, IO_Serial_Bitrate(5713));
-	    	cfsetispeed(&newtio, IO_Serial_Bitrate(5713));
-#endif
-        } else {
-            cfsetospeed(&newtio, IO_Serial_Bitrate(props->output_bitrate));
-            cfsetispeed(&newtio, IO_Serial_Bitrate(props->input_bitrate));
-        }
-    } else {
-        /* invalid */
-        return FALSE;
-    }
-        
+	cfsetospeed(&newtio, IO_Serial_Bitrate(props->output_bitrate));
+	cfsetispeed(&newtio, IO_Serial_Bitrate(props->input_bitrate));
+	
 	/* Set the character size */
 	switch (props->bits)
 	{
@@ -679,7 +627,7 @@ bool IO_Serial_Read (IO_Serial * io, unsigned timeout, unsigned size, BYTE * dat
 	printf ("IO: Receiving: ");
 	fflush (stdout);
 #endif
-	for (count = 0; count < size * (_in_echo_read ? (1+io_serial_need_dummy_char) : 1); count++)
+	for (count = 0; count < size; count++)
 	{
 		if (IO_Serial_WaitToRead (io->fd, 0, timeout))
 		{
@@ -691,7 +639,7 @@ bool IO_Serial_Read (IO_Serial * io, unsigned timeout, unsigned size, BYTE * dat
 #endif
 				return FALSE;
 			}
-			data[_in_echo_read ? count/(1+io_serial_need_dummy_char) : count] = c;
+			data[count] = c;
 			
 #ifdef DEBUG_IO
 			printf ("%X ", c);
@@ -709,8 +657,6 @@ bool IO_Serial_Read (IO_Serial * io, unsigned timeout, unsigned size, BYTE * dat
 		}
 	}
 	
-    _in_echo_read = 0;
-
 #ifdef DEBUG_IO
 	printf ("\n");
 	fflush (stdout);
@@ -722,8 +668,6 @@ bool IO_Serial_Read (IO_Serial * io, unsigned timeout, unsigned size, BYTE * dat
 bool IO_Serial_Write (IO_Serial * io, unsigned delay, unsigned size, BYTE * data)
 {
 	unsigned count, to_send;
-    BYTE data_w[512];
-    int i_w;
 #ifdef DEBUG_IO
 	unsigned i;
 	
@@ -742,15 +686,8 @@ bool IO_Serial_Write (IO_Serial * io, unsigned delay, unsigned size, BYTE * data
 		
 		if (IO_Serial_WaitToWrite (io, delay, 1000))
 		{
-            for (i_w=0; i_w < to_send; i_w++) {
-            data_w [(1+io_serial_need_dummy_char)*i_w] = data [count + i_w];
-            if (io_serial_need_dummy_char) {
-              data_w [2*i_w+1] = 0x00;
-              }
-            }
-            unsigned int u = write (io->fd, data_w, (1+io_serial_need_dummy_char)*to_send);
-            _in_echo_read = 1;
-            if (u != (1+io_serial_need_dummy_char)*to_send)
+			unsigned int u = write (io->fd, data + count, to_send);
+			if (u != to_send)
 			{
 #ifdef DEBUG_IO
 				printf ("ERROR\n");
@@ -765,8 +702,8 @@ bool IO_Serial_Write (IO_Serial * io, unsigned delay, unsigned size, BYTE * data
 				io->wr += to_send;
 			
 #ifdef DEBUG_IO
-			for (i=0; i<(1+io_serial_need_dummy_char)*to_send; i++)
-				printf ("%X ", data_w[count + i]);
+			for (i=0; i<to_send; i++)
+				printf ("%X ", data[count + i]);
 			fflush (stdout);
 #endif
 		}
@@ -1005,8 +942,8 @@ static void IO_Serial_ClearPropertiesCache (IO_Serial * io)
 
 static void IO_Serial_DeviceName (unsigned com, bool usbserial, char * filename, unsigned length)
 {
-	extern char oscam_device[];
-        snprintf (filename, length, "%s", oscam_device);
+	extern char mpcs_device[];
+        snprintf (filename, length, "%s", mpcs_device);
 //	if(com==1)
 //		snprintf (filename, length, "/dev/tts/%d", com - 1);
 //	else

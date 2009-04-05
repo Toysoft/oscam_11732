@@ -65,7 +65,7 @@ void cs_write_log(char *txt)
 
 int cs_init_log(char *file) 
 {
-  static char *head = ">> OSCam <<  cardserver started";
+  static char *head = ">> STREAMBOARD <<  mp-cardserver started";
 
   if (!strcmp(file, "stdout"))
   {
@@ -90,7 +90,7 @@ int cs_init_log(char *file)
         memset(line, '-', sizeof(line));
         line[(sizeof(line)/sizeof(char))-1]='\0';
         time(&t);
-        fprintf(fp, "\n%s\n>> OSCam <<  cardserver started at %s%s\n", line, ctime(&t), line);
+        fprintf(fp, "\n%s\n>> STREAMBOARD <<  mp-cardserver started at %s%s\n", line, ctime(&t), line);
         cs_log_config();
       }
     }
@@ -98,7 +98,7 @@ int cs_init_log(char *file)
   }
   else
   {
-    openlog("oscam", LOG_NDELAY, LOG_DAEMON);
+    openlog("mpcs", LOG_NDELAY, LOG_DAEMON);
     use_syslog=1;
     cs_log(head);
     return(0);

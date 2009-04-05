@@ -1,12 +1,10 @@
 #include "globals.h"
 #include "reader-common.h"
 
-char oscam_device[128];
-int  oscam_card_detect;
-int  mhz;
-int  reader_irdeto_mode;
+char mpcs_device[128];
+int  mpcs_card_detect;
 
-uchar cta_cmd[272], cta_res[260], atr[64];
+uchar cta_cmd[272], cta_res[256], atr[64];
 ushort cta_lr, atr_size=0;
 static int cs_ptyp_orig; //reinit=1, 
 static int card_status=0;
@@ -16,7 +14,6 @@ static int card_status=0;
 #define SC_VIACCESS 3
 #define SC_CONAX 4
 #define SC_SECA 5
-#define SC_VIDEOGUARD2 6
 
 static int reader_device_type(char *device, int typ)
 {
@@ -71,7 +68,7 @@ int reader_doapi(uchar dad, uchar *buf, int l, int dbg)
   int rc;
   uchar sad;
 
-//  oscam_card_inserted=4;
+//  mpcs_card_inserted=4;
   sad=2;
   cta_lr=sizeof(cta_res)-1;
   cs_ptyp_orig=cs_ptyp;
@@ -138,7 +135,6 @@ static int reader_activate_card()
 //  for (i=0; (i<5) && ((ret!=OK)||(cta_res[cta_lr-2]!=0x90)); i++)
   for (i=0; i<5; i++)
   {
-    reader_irdeto_mode = i%2 == 1;
     cta_cmd[0] = CTBCS_CLA;
     cta_cmd[1] = CTBCS_INS_REQUEST;
     cta_cmd[2] = CTBCS_P1_INTERFACE1;
@@ -183,10 +179,6 @@ void reader_card_info()
         rc=cryptoworks_card_info(); break;
       case SC_VIACCESS:
         rc=viaccess_card_info(); break;
-      case SC_CONAX:
-        rc=conax_card_info(); break;
-      case SC_VIDEOGUARD2:
-        rc=videoguard_card_info(); break;
       default: rc=0;
     }
   }
@@ -200,7 +192,6 @@ static int reader_get_cardsystem(void)
   if (cryptoworks_card_init(atr, atr_size))	reader[ridx].card_system=SC_CRYPTOWORKS;
   if (seca_card_init(atr, atr_size))	reader[ridx].card_system=SC_SECA;
   if (viaccess_card_init(atr, atr_size))	reader[ridx].card_system=SC_VIACCESS;
-  if (videoguard_card_init(atr, atr_size))  reader[ridx].card_system=SC_VIDEOGUARD2;
   if (!reader[ridx].card_system)	cs_ri_log("card system not supported");
   cs_ri_brk(1);
   return(reader[ridx].card_system);
@@ -227,11 +218,10 @@ static int reader_card_inserted(void)
 int reader_device_init(char *device, int typ)
 {
   int rc;
-  oscam_card_detect=reader[ridx].detect;
-  mhz=reader[ridx].mhz;
+  mpcs_card_detect=reader[ridx].detect;
   cs_ptyp_orig=cs_ptyp;
   cs_ptyp=D_DEVICE;
-  snprintf(oscam_device, sizeof(oscam_device), "%s", device);
+  snprintf(mpcs_device, sizeof(mpcs_device), "%s", device);
   if ((rc=CT_init(1, reader_device_type(device, typ)))!=OK)
     cs_log("Cannot open device: %s", device);
   cs_debug("ct_init on %s: %d", device, rc);
@@ -255,13 +245,6 @@ int reader_checkhealth(void)
         reader[ridx].online=1;
         reader_card_info();
       }
-
-      int i;
-      for( i=1; i<CS_MAXPID; i++ ) {
-        if( client[i].pid && client[i].typ=='c' && client[i].usr[0] ) {
-          kill(client[i].pid, SIGQUIT);
-        }
-      }
     }
   }
   else
@@ -272,8 +255,6 @@ int reader_checkhealth(void)
       client[cs_idx].lastemm=0;
       client[cs_idx].lastecm=0;
       client[cs_idx].au=-1;
-      extern int io_serial_need_dummy_char;
-      io_serial_need_dummy_char=0;
       cs_log("card ejected");
     }
     card_status=0;
@@ -304,8 +285,6 @@ int reader_ecm(ECM_REQUEST *er)
           rc=(conax_do_ecm(er)) ? 1 : 0; break;
         case SC_SECA:
           rc=(seca_do_ecm(er)) ? 1 : 0; break;
-        case SC_VIDEOGUARD2:
-          rc=(videoguard_do_ecm(er)) ? 1 : 0; break;
         default: rc=0;
       }
     }
@@ -333,8 +312,6 @@ int reader_emm(EMM_PACKET *ep)
         rc=conax_do_emm(ep); break;
       case SC_SECA:
         rc=seca_do_emm(ep); break;
-      case SC_VIDEOGUARD2:
-        rc=videoguard_do_emm(ep); break;
       default: rc=0;
     }
   }

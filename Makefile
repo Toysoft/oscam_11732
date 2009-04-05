@@ -26,23 +26,23 @@ all:	\
 
 
 dist:	std
-	@cd Distribution && tar cvf "../oscam$(VER).tar" *
-	@bzip2 -9f "oscam$(VER).tar"
+	@cd Distribution && tar cvf "../mpcs$(VER).tar" *
+	@bzip2 -9f "mpcs$(VER).tar"
 
 extra:	all
-	@cd Distribution && tar cvf "../oscam$(VER)-extra.tar" *
-	@bzip2 -9f "oscam$(VER)-extra.tar"
+	@cd Distribution && tar cvf "../mpcs$(VER)-extra.tar" *
+	@bzip2 -9f "mpcs$(VER)-extra.tar"
 
 clean:
-	@-rm -rf oscam-ostype.h lib Distribution/oscam-*
+	@-rm -rf mpcs-ostype.h lib Distribution/mpcs-*
 
 tar:	clean
-	@tar cvf "oscam$(VER)-src.tar" Distribution Make* *.c *.h cscrypt csctapi
-	@bzip2 -9f "oscam$(VER)-src.tar"
+	@tar cvf "mpcs$(VER)-src.tar" Distribution Make* *.c *.h cscrypt csctapi
+	@bzip2 -9f "mpcs$(VER)-src.tar"
 
 nptar:	clean
-	@tar cvf "oscam$(VER)-nonpublic-src.tar" Distribution Make* *.c *.np *.h cscrypt csctapi csgbox
-	@bzip2 -9f "oscam$(VER)-nonpublic-src.tar"
+	@tar cvf "mpcs$(VER)-nonpublic-src.tar" Distribution Make* *.c *.np *.h cscrypt csctapi csgbox
+	@bzip2 -9f "mpcs$(VER)-nonpublic-src.tar"
 
 ######################################################################
 #
@@ -51,8 +51,8 @@ nptar:	clean
 ######################################################################
 i386-pc-linux:
 	@-$(MAKE) --no-print-directory \
-		-f Maketype TYP=$(subst i386,$(shell uname --machine),$(subst cross-,,$@)) \
-		OS_LIBS="-lcrypto" \
+		-f Maketype TYP=$(subst cross-,,$@) \
+		OS_LIBS="" \
 		OS_CULI="-lncurses" \
 		OS_PTLI="-lpthread" \
 		DS_OPTS="-O2 -DOS_LINUX" \
@@ -115,7 +115,7 @@ cross-i386-pc-freebsd:
 cross-powerpc-tuxbox-linux:
 	@-$(MAKE) --no-print-directory \
 		-f Maketype TYP=$(subst cross-,,$@) \
-		OS_LIBS="-lcrypto -ldl" \
+		OS_LIBS="" \
 		OS_CULI="-lncurses" \
 		OS_PTLI="-lpthread" \
 		DS_OPTS="-O2 -DOS_LINUX -DTUXBOX -DPPC" \
@@ -127,22 +127,6 @@ cross-powerpc-tuxbox-linux:
 		DS_LD=powerpc-tuxbox-linux-gnu-ld \
 		DS_RL=powerpc-tuxbox-linux-gnu-ranlib \
 		DS_ST=powerpc-tuxbox-linux-gnu-strip
-
-cross-powerpc-tuxbox-linux-uclibc:
-	@-$(MAKE) --no-print-directory \
-		-f Maketype TYP=$(subst cross-,,$@) \
-		OS_LIBS="" \
-		OS_CULI="-lncurses" \
-		OS_PTLI="-lpthread" \
-		DS_OPTS="-O2 -DOS_LINUX -DTUXBOX -DPPC" \
-		DS_CFLAGS="-c" \
-		DS_LDFLAGS="" \
-		DS_ARFLAGS="-rvsl" \
-		DS_CC=powerpc-tuxbox-linux-uclibc-gcc \
-		DS_AR=powerpc-tuxbox-linux-uclibc-ar \
-		DS_LD=powerpc-tuxbox-linux-uclibc-ld \
-		DS_RL=powerpc-tuxbox-linux-uclibc-ranlib \
-		DS_ST=powerpc-tuxbox-linux-uclibc-strip
 
 
 ######################################################################
@@ -174,7 +158,7 @@ cross-sh4-linux:
 cross-i386-pc-cygwin:
 	@-$(MAKE) --no-print-directory \
 		-f Maketype TYP=$(subst cross-,,$@) \
-		OS_LIBS="-lcrypto" \
+		OS_LIBS="" \
 		OS_CULI="-lncurses" \
 		OS_PTLI="-lpthread" \
 		DS_OPTS="-O2 -DOS_CYGWIN32" \
@@ -195,7 +179,7 @@ cross-i386-pc-cygwin:
 i386-pc-cygwin:
 	@-$(MAKE) --no-print-directory \
 		-f Maketype TYP=$(subst cross-,,$@) \
-		OS_LIBS="-lcrypto" \
+		OS_LIBS="" \
 		OS_CULI="-lncurses" \
 		OS_PTLI="-lpthread" \
 		DS_OPTS="-O2 -DOS_CYGWIN32 -I /tmp/include" \
@@ -324,7 +308,7 @@ cross-mipsel-router-linux-uclibc928:
 cross-mipsel-tuxbox-linux-glibc:
 	@-$(MAKE) --no-print-directory \
 		-f Maketype TYP=$(subst cross-,,$@) \
-		OS_LIBS="-lcrypto" \
+		OS_LIBS="" \
 		OS_CULI="-lncurses" \
 		OS_PTLI="-lpthread" \
 		DS_OPTS="-O2 -DOS_LINUX -DTUXBOX -DMIPSEL -static-libgcc" \
@@ -336,22 +320,6 @@ cross-mipsel-tuxbox-linux-glibc:
 		DS_LD=mipsel-linux-glibc-ld \
 		DS_RL=mipsel-linux-glibc-ranlib \
 		DS_ST=mipsel-linux-glibc-strip
-
-cross-mipsel-tuxbox-linux:
-	@-$(MAKE) --no-print-directory \
-		-f Maketype TYP=$(subst cross-,,$@) \
-		OS_LIBS="-lcrypto" \
-		OS_CULI="-lncurses" \
-		OS_PTLI="-lpthread" \
-		DS_OPTS="-O2 -DOS_LINUX -DTUXBOX -DMIPSEL -static-libgcc" \
-		DS_CFLAGS="-c" \
-		DS_LDFLAGS="" \
-		DS_ARFLAGS="-rvsl" \
-		DS_CC=mipsel-linux-gcc \
-		DS_AR=mipsel-linux-ar \
-		DS_LD=mipsel-linux-ld \
-		DS_RL=mipsel-linux-ranlib \
-		DS_ST=mipsel-linux-strip
 
 ######################################################################
 #

@@ -1,18 +1,18 @@
 #include "globals.h"
 #ifdef CS_WITH_BOXKEYS
-#  include "oscam-boxkeys.np"
+#  include "mpcs-boxkeys.np"
 #endif
 
-static char *cs_conf="oscam.conf";
-static char *cs_user="oscam.user";
-static char *cs_srvr="oscam.server";
-static char *cs_srid="oscam.srvid";
-static char *cs_l4ca="oscam.guess";
-static char *cs_cert="oscam.cert";
-static char *cs_sidt="oscam.services";
-//static char *cs_ird="oscam.ird";
+static char *cs_conf="mpcs.conf";
+static char *cs_user="mpcs.user";
+static char *cs_srvr="mpcs.server";
+static char *cs_srid="mpcs.srvid";
+static char *cs_l4ca="mpcs.guess";
+static char *cs_cert="mpcs.cert";
+static char *cs_sidt="mpcs.services";
+//static char *cs_ird="mpcs.ird";
 #ifdef CS_ANTICASC
-static char *cs_ac="oscam.ac";
+static char *cs_ac="mpcs.ac";
 #endif
 
 static char token[4096];
@@ -123,32 +123,6 @@ static void chk_caidtab(char *caidasc, CAIDTAB *ctab)
   }
 }
 
-static void chk_tuntab(char *tunasc, TUNTAB *ttab)
-{
-  int i;
-  char *ptr1, *ptr2, *ptr3;
-  for (i=0, ptr1=strtok(tunasc, ","); (i<CS_MAXTUNTAB) && (ptr1); ptr1=strtok(NULL, ","))
-  {
-    ulong bt_caidfrom, bt_caidto, bt_srvid;
-    if( (ptr3=strchr(trim(ptr1), ':')) )
-      *ptr3++='\0';
-    else
-      ptr3="";
-    if( (ptr2=strchr(trim(ptr1), '.')) )
-      *ptr2++='\0';
-    else
-      ptr2="";
-    if ((bt_caidfrom=a2i(ptr1, 2))|(bt_srvid=a2i(ptr2,-2))|(bt_caidto=a2i(ptr3, 2)))
-    {
-      ttab->bt_caidfrom[i]=bt_caidfrom;
-      ttab->bt_caidto[i]=bt_caidto;
-      ttab->bt_srvid[i++]=bt_srvid;
-    }
-//    else
-//      cs_log("WARNING: wrong Betatunnel in %s -> ignored", cs_user);
-  }
-}
-
 static void chk_services(char *labels, ulong *sidok, ulong *sidno)
 {
   int i;
@@ -227,9 +201,8 @@ static void chk_port_tab(char *portasc, PTAB *ptab)
   char *ptr1,*ptr2,*ptr3;
   char *ptr[CS_MAXPORTS] = {0};
   int  port[CS_MAXPORTS] = {0};
-  int previous_nports = ptab->nports;
 
-  for (nfilts=i=previous_nports, ptr1=strtok(portasc, ";"); (i<CS_MAXCAIDTAB) && (ptr1); ptr1=strtok(NULL, ";"), i++)
+  for (nfilts=i=0, ptr1=strtok(portasc, ";"); (i<CS_MAXCAIDTAB) && (ptr1); ptr1=strtok(NULL, ";"), i++)
   {
     ptr[i] = ptr1;
     if( (ptr2=strchr(trim(ptr1), '@')) ) 
@@ -248,8 +221,8 @@ static void chk_port_tab(char *portasc, PTAB *ptab)
     ptab->nports = 1;
   }
 
-  iport=ifilt = previous_nports;
-  for (i=previous_nports; i<nfilts; i++) 
+  iport=ifilt = 0;
+  for (i=0; i<nfilts; i++) 
   {
     if( port[i]!=0 ) iport = i;
     for (j=0, ptr3=strtok(ptr[i], ","); (j<CS_MAXPROV) && (ptr3); ptr3=strtok(NULL, ","), j++)
@@ -537,7 +510,7 @@ int search_boxkey(ushort caid, ulong provid, char *key)
     }
     fclose(fp);
   }
-#ifdef OSCAM_INBUILD_KEYS
+#ifdef MPCS_INBUILD_KEYS
   for(i=0; (!rc) && (npkey[i].keylen); i++)
     if (rc=((caid==npkey[i].caid) && (provid==npkey[i].provid)))
       memcpy(key, npkey[i].key, npkey[i].keylen);
@@ -575,7 +548,7 @@ int init_config()
   cfg->ac_samples=10;
   cfg->ac_denysamples=8;
   cfg->ac_fakedelay=1000;
-  strcpy(cfg->ac_logfile, "./oscam_ac.log");
+  strcpy(cfg->ac_logfile, "./mpcs_ac.log");
 #endif
   sprintf(token, "%s%s", cs_confdir, cs_conf);
   if (!(fp=fopen(token, "r")))
@@ -633,7 +606,7 @@ static void chk_account(char *token, char *value, struct s_auth *account)
   if (!strcmp(token, "user")) strncpy(account->usr, value, sizeof(account->usr)-1);
   if (!strcmp(token, "pwd")) strncpy(account->pwd, value, sizeof(account->pwd)-1);
   if (!strcmp(token, "hostname")) strncpy(account->dyndns, value, sizeof(account->dyndns)-1);
-  if (!strcmp(token, "betatunnel")) chk_tuntab(value, &account->ttab);
+  if (!strcmp(token, "1801to1702")) account->premhack=atoi(value);
   if (!strcmp(token, "uniq")) account->uniq=atoi(value);
   if (!strcmp(token, "sleep")) account->tosleep=atoi(value);
   if (!strcmp(token, "monlevel")) account->monlvl=atoi(value);
@@ -733,7 +706,6 @@ int init_userdb()
       account->monlvl=cfg->mon_level;
       account->tosleep=cfg->tosleep;
       for (i=1; i<CS_MAXCAIDTAB; account->ctab.mask[i++]=0xffff);
-      for (i=1; i<CS_MAXTUNTAB; account->ttab.bt_srvid[i++]=0x0000);
       nr++;
 #ifdef CS_ANTICASC
       account->ac_users=cfg->ac_users;
@@ -948,8 +920,6 @@ static void chk_reader(char *token, char *value, struct s_reader *rdr)
         case 1: strncpy(rdr->r_pwd, ptr, sizeof(rdr->r_pwd)-1); break;
       }
     }
-  if( !strcmp(token, "pincode") )
-      strncpy(rdr->pincode, value, sizeof(rdr->pincode)-1);
   /*
    *	case insensitive
    */
@@ -973,17 +943,6 @@ static void chk_reader(char *token, char *value, struct s_reader *rdr)
         if ((value[0]=='!') && (!strcmp(value+1, RDR_CD_TXT[i])))
           rdr->detect=i|0x80;
     }
-  if (!strcmp(token, "mhz"))
-  {
-    if (!strcmp(value, "600")) rdr->mhz=600;
-    if (!strcmp(value, "357")) rdr->mhz=357;
-    if (!strcmp(value, "358")) rdr->mhz=358;
-  }
-  if (!strcmp(token, "customspeed"))
-  {
-    if (!strcmp(value, "0")) rdr->custom_speed=0;
-    if (!strcmp(value, "1"))rdr->custom_speed=1;
-  }
   if (!strcmp(token, "protocol"))
   {
     if (!strcmp(value, "mouse"))       rdr->typ=R_MOUSE;
@@ -1054,9 +1013,6 @@ int init_readerdb()
       reader[nr].tcp_rto = 30;      
       reader[nr].show_cls = 10;
       reader[nr].maxqlen = CS_MAXQLEN;
-      reader[nr].mhz = 357;
-      reader[nr].custom_speed = 1;
-      strcpy(reader[nr].pincode, "none");
       for (i=1; i<CS_MAXCAIDTAB; reader[nr].ctab.mask[i++]=0xffff);
       continue;
     }

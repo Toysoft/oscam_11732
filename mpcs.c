@@ -21,6 +21,7 @@ struct s_module ph[CS_MAX_MOD];	// Protocols
 int	maxph=0;		// Protocols used
 int	cs_hw=0;		// hardware autodetect
 int	is_server=0;		// used in modules to specify function
+int	premhack=0;		// used to activate premiere hack 1801 -> 1702
 pid_t	master_pid=0;		// master pid OUTSIDE shm
 ushort	len4caid[256];		// table for guessing caid (by len)
 char	cs_confdir[128]=CS_CONFDIR;
@@ -36,7 +37,7 @@ struct s_acasc ac_stat[CS_MAXPID];
 *****************************************************************************/
 int			*ecmidx;	// Shared Memory
 int			*logidx;	// Shared Memory
-int			*oscam_sem;	// sem (multicam.o)
+int			*mpcs_sem;	// sem (multicam.o)
 int			*c_start;	// idx of 1st client
 int			*log_fd;	// log-process is running
 struct	s_ecm		  *ecmcache;  // Shared Memory
@@ -84,7 +85,6 @@ static	char	mloc[128]={0};
 static	int	shmid=0;		// Shared Memory ID
 static	int	cs_last_idx=0;		// client index of last fork (master only)
 static	char*	credit[] = {
-		"dukat for the great MpCS piece of code",
 		"all members of streamboard.de.vu for testing",
 		"scotty and aroureos for the first softcam (no longer used)",
 		"John Moore for the hsic-client (humax 5400) and the arm-support",
@@ -131,9 +131,8 @@ char *cs_platform(char *buf)
 static void usage()
 {
   int i;
-  fprintf(stderr, "\nOSCam cardserver v%s (%s) - (w) 2009 by smurzch\n", CS_VERSION_X, CS_OSTYPE);
-  fprintf(stderr, "\tbased on streamboard mp-cardserver v0.9d - (w) 2004-2007 by dukat\n\n");
-  fprintf(stderr, "oscam [-b] [-c config-dir]");
+  fprintf(stderr, "\nstreamboard mp-cardserver v%s (%s) - (w) 2004-2007 by dukat\n\n", CS_VERSION_X, CS_OSTYPE);
+  fprintf(stderr, "cardserver [-b] [-c config-dir]");
 #ifdef CS_NOSHM
   fprintf(stderr, " [-m memory-file]");
 #endif
@@ -348,7 +347,6 @@ static void cs_reinit_clients()
         client[i].sidtabok= account->sidtabok;   // services
         client[i].sidtabno= account->sidtabno;   // services
         memcpy(&client[i].ctab, &account->ctab, sizeof(client[i].ctab));
-        memcpy(&client[i].ttab, &account->ttab, sizeof(client[i].ttab));
 #ifdef CS_ANTICASC
         client[i].ac_idx     = account->ac_idx;
         client[i].ac_penalty = account->ac_penalty;
@@ -535,11 +533,10 @@ int cs_fork(in_addr_t ip, in_port_t port)
                      else
                      {
                        if (reader[ridx].typ==R_MOUSE)
-                         cs_log("reader started (pid=%d, device=%s, detect=%s%s, mhz=%d)",
+                         cs_log("reader started (pid=%d, device=%s, detect=%s%s)",
                                 pid, reader[ridx].device,
                                 reader[ridx].detect&0x80 ? "!" : "",
-                                RDR_CD_TXT[reader[ridx].detect&0x7f],
-                                reader[ridx].mhz);
+                                RDR_CD_TXT[reader[ridx].detect&0x7f]);
 		                    else
                          cs_log("reader started (pid=%d, device=%s)",
                                 pid, reader[ridx].device);
@@ -663,8 +660,8 @@ static void init_shm()
   logidx=(int *)((void *)mcl+sizeof(int));
   c_start=(int *)((void *)logidx+sizeof(int));
   log_fd=(int *)((void *)c_start+sizeof(int));
-  oscam_sem=(int *)((void *)log_fd+sizeof(int));
-  client=(struct s_client *)((void *)oscam_sem+sizeof(int));
+  mpcs_sem=(int *)((void *)log_fd+sizeof(int));
+  client=(struct s_client *)((void *)mpcs_sem+sizeof(int));
   reader=(struct s_reader *)&client[CS_MAXPID];
 #ifdef CS_WITH_GBOX
   Cards=(struct card_struct*)&reader[CS_MAXREADER];
@@ -683,8 +680,8 @@ static void init_shm()
   printf("SHM ALLOC: %x\n", shmsize);
   printf("SHM START: %p\n", (void *) ecmcache);
   printf("SHM ST1: %p %x (%x)\n", (void *) ecmidx, ((void *) ecmidx) - ((void *) ecmcache), CS_ECMCACHESIZE*(sizeof(struct s_ecm)));
-  printf("SHM ST2: %p %x (%x)\n", (void *) oscam_sem, ((void *) oscam_sem) - ((void *) ecmidx), sizeof(int));
-  printf("SHM ST3: %p %x (%x)\n", (void *) client, ((void *) client) - ((void *) oscam_sem), sizeof(int));
+  printf("SHM ST2: %p %x (%x)\n", (void *) mpcs_sem, ((void *) mpcs_sem) - ((void *) ecmidx), sizeof(int));
+  printf("SHM ST3: %p %x (%x)\n", (void *) client, ((void *) client) - ((void *) mpcs_sem), sizeof(int));
   printf("SHM ST4: %p %x (%x)\n", (void *) reader, ((void *) reader) - ((void *) client), CS_MAXPID*(sizeof(struct s_client)));
   printf("SHM ST5: %p %x (%x)\n", (void *) cfg, ((void *) cfg) - ((void *) reader), CS_MAXREADER*(sizeof(struct s_reader)));
   printf("SHM ST6: %p %x (%x)\n", ((void *) cfg)+sizeof(struct s_config), sizeof(struct s_config), sizeof(struct s_config));
@@ -695,7 +692,7 @@ static void init_shm()
 
   *ecmidx=0;
   *logidx=0;
-  *oscam_sem=0;
+  *mpcs_sem=0;
   client[0].pid=getpid();
   client[0].login=time((time_t *)0);
   client[0].ip=cs_inet_addr("127.0.0.1");
@@ -1086,7 +1083,7 @@ int cs_auth_client(struct s_auth *account, char *e_txt)
           client[cs_idx].sidtabok= account->sidtabok;   // services
           client[cs_idx].sidtabno= account->sidtabno;   // services
           client[cs_idx].pcrc  = crc32(0L, MD5(account->pwd, strlen(account->pwd), NULL), 16);
-          memcpy(&client[cs_idx].ttab, &account->ttab, sizeof(client[cs_idx].ttab));
+          premhack=account->premhack;
 #ifdef CS_ANTICASC
           ac_init_client(account);
 #endif
@@ -1495,7 +1492,7 @@ void guess_irdeto(ECM_REQUEST *er)
     {
       if( er->srvid && (er->srvid!=ptr->sid) )
       {
-        cs_debug("sid mismatched (ecm: %04X, guess: %04X), wrong oscam.ird file?",
+        cs_debug("sid mismatched (ecm: %04X, guess: %04X), wrong mpcs.ird file?",
                   er->srvid, ptr->sid);
         return;
       }
@@ -1641,35 +1638,21 @@ void get_cw(ECM_REQUEST *er)
                 break;
       }
 
-    if (&client[cs_idx].ttab)  // Betatunneling
+    if (premhack)	// quickhack for 1801:000501
     // moved behind the check routines, because newcamd-ECM will fail if ecm is converted before
-    {
-      int n;
-      ulong mask_all=0xFFFF;
-      TUNTAB *ttab;
-      ttab=&client[cs_idx].ttab;
-      for (n=0; (n<CS_MAXCAIDTAB); n++)
-      if ((er->caid==ttab->bt_caidfrom[n]) && ((er->srvid==ttab->bt_srvid[n]) || (ttab->bt_srvid[n])==mask_all))
+      if (er->caid==0x1801 && er->ecm[3]==7 && er->ecm[5]==5 && er->ecm[6]==1)
       {
         int l;
-        char hack_n3[13]={0x70, 0x51, 0xc7, 0x00, 0x00, 0x00, 0x01, 0x10, 0x10, 0x00, 0x87, 0x12, 0x07};
-        char hack_n2[13]={0x70, 0x51, 0xc9, 0x00, 0x00, 0x00, 0x01, 0x10, 0x10, 0x00, 0x48, 0x12, 0x07};
-        er->caid=ttab->bt_caidto[n];
+        char hack[13]={0x70, 0x51, 0xc9, 0x00, 0x00, 0x00, 0x01, 0x10, 0x10, 0x00, 0x48, 0x12, 0x07};
+        er->caid=0x1702;
         er->prid=0;
         er->l=(er->ecm[2]+3);
         memmove(er->ecm+14, er->ecm+4, er->l-1);
-        if (er->l > 0x88)
-        {
-           memcpy(er->ecm+1, hack_n3, 13);
-           if (er->ecm[0]==0x81) er->ecm[12]+= 1;
-        }
-        else memcpy(er->ecm+1, hack_n2, 13);
+        memcpy(er->ecm+1, hack, 13);
         er->l+=10;
         er->ecm[2]=er->l-3;
-        cs_debug("ecm converted from: 0x%X to betacrypt: 0x%X for service id:0x%X",
-                 ttab->bt_caidfrom[n], ttab->bt_caidto[n], ttab->bt_srvid[n]);
+        cs_debug("ecm converted 1801:000501 -> 1702:000000");
       }
-    }
 
     memcpy(er->ecmd5, MD5(er->ecm, er->l, NULL), CS_ECMSTORESIZE);
 
@@ -1930,7 +1913,7 @@ int main (int argc, char *argv[])
            module_gbox,
 #endif
            module_radegast,
-           module_oscam_ser,
+           module_mpcser,
            0
   };
 
@@ -2026,7 +2009,7 @@ int main (int argc, char *argv[])
 #endif
 
   for (i=0; i<CS_MAX_MOD; i++)
-    if (ph[i].type & MOD_CONN_SERIAL)		// for now: oscam_ser only
+    if (ph[i].type & MOD_CONN_SERIAL)		// for now: mpcser only
       if (ph[i].s_handler)
         ph[i].s_handler(i);
 
