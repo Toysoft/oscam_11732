@@ -29,7 +29,7 @@
 
 #ifndef CS_GLOBALS
 #define CS_GLOBALS
-#define CS_VERSION    "0.99.4svn"
+#define CS_VERSION    "0.99.4a"
 
 #if defined(__GNUC__)
 #  define GCC_PACK __attribute__((packed))
@@ -437,6 +437,7 @@ struct s_client
 
 struct s_reader
 {
+  int		smargopatch; //FIXME workaround for Smargo until native mode works
   int		pid;
   int       cs_idx;
   int       enable;
@@ -475,10 +476,6 @@ struct s_reader
   ushort    acs;    // irdeto
   ushort    caid[16];
   uchar     b_nano[256];
-  int       blockemm_unknown; //block EMMs that have unknown type
-  int       blockemm_u;				//blcok Unique EMMs
-  int       blockemm_s;				//block Shared EMMS
-  int       blockemm_g;				//block Global EMMs
   char      * emmfile;
   char      pincode[5];
   int		ucpk_valid;
@@ -534,9 +531,9 @@ struct s_reader
   SCARDHANDLE hCard;
   DWORD dwActiveProtocol;
 #endif
-#ifdef LIBUSB
-  SR_CONFIG *sr_config;
-#endif
+#ifdef LIBUSB 
+  SR_CONFIG *sr_config; 
+#endif 
 };
 
 #ifdef CS_ANTICASC
@@ -767,16 +764,10 @@ typedef struct emm_packet_t
   uchar l;
   uchar caid[2];
   uchar provid[4];
-  uchar hexserial[8];					 //contains hexserial or SA of EMM
+  uchar hexserial[8];
   uchar type;
   int   cidx;
 } GCC_PACK EMM_PACKET;
-
-//EMM types:
-#define UNKNOWN 0
-#define UNIQUE	1
-#define SHARED	2
-#define GLOBAL	3
 
 // oscam-simples
 extern char *remote_txt(void);
@@ -841,6 +832,7 @@ extern unsigned long *IgnoreList;
 
 extern struct s_config *cfg;
 extern char cs_confdir[], *loghist;
+extern EMM_PACKET epg;
 extern struct s_module ph[CS_MAX_MOD];
 extern ECM_REQUEST *ecmtask;
 #ifdef CS_ANTICASC
@@ -994,7 +986,6 @@ extern int reader_checkhealth(void);
 extern void reader_post_process(void);
 extern int reader_ecm(ECM_REQUEST *);
 extern int reader_emm(EMM_PACKET *);
-int reader_get_emm_type(EMM_PACKET *ep, struct s_reader * reader);
 
 #ifdef HAVE_PCSC
 // reader-pcsc

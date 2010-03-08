@@ -26,6 +26,7 @@ ushort  len4caid[256];    // table for guessing caid (by len)
 char  cs_confdir[128]=CS_CONFDIR;
 uchar mbuf[1024];   // global buffer
 ECM_REQUEST *ecmtask;
+EMM_PACKET  epg;
 #ifdef CS_ANTICASC
 struct s_acasc ac_stat[CS_MAXPID];
 #endif
@@ -2104,59 +2105,29 @@ void log_emm_request(int auidx)
 
 void do_emm(EMM_PACKET *ep)
 {
-	int au;
-	au = client[cs_idx].au;
+  int au;//, ephs;
+  au=client[cs_idx].au;
 
-	cs_ddump_mask(D_ATR, ep->emm, ep->l, "emm:");
-
-	if ((au < 0) || (au >= CS_MAXREADER))
-		return;
-
-	if (!reader_get_emm_type(ep, &reader[au])) //decodes ep->type and ep->hexserial from the EMM
-		return;
-
-	cs_ddump_mask(D_EMM, ep->hexserial, 8, "emm UA/SA:");
-
-	switch (ep->type) {
-		case UNKNOWN:
-  			cs_debug_mask(D_EMM, "emmtype UNKNOWN. Reader %s has serial %s.", reader[au].label, cs_hexdump(0, reader[au].hexserial, 8));
-			if (reader[au].blockemm_unknown) return;
-			break;
-
-		case UNIQUE:
-  			cs_debug_mask(D_EMM, "emmtype UNIQUE. Reader %s has serial %s.", reader[au].label, cs_hexdump(0, reader[au].hexserial, 8));
-			if (reader[au].blockemm_u) return;
-			break;
-
-		case SHARED:
-  			cs_debug_mask(D_EMM, "emmtype SHARED. Reader %s has serial %s.", reader[au].label, cs_hexdump(0, reader[au].hexserial, 8));
-			if (reader[au].blockemm_s) return;
-			break;
-
-		// FIXME only camd33 delivers hexserial from the net, newcamd, camd35 copy 
-		// cardreader hexserial in; reader_get_emm_type overwrites this with real SA value if known!
-		case GLOBAL:
-  			cs_debug_mask(D_EMM, "emmtype GLOBAL. Reader %s has serial %s.", reader[au].label, cs_hexdump(0, reader[au].hexserial, 8));
-			if (reader[au].blockemm_g) return;
-			break;
-	}
-
-	client[cs_idx].lastemm = time((time_t)0);
-	cs_ddump_mask(D_EMM, ep->emm, ep->l, "emm:");
-
-	if ((!reader[au].fd) ||       // reader has no fd
-	(reader[au].caid[0] != b2i(2,ep->caid))) {   // wrong caid
+  if ((au<0) || (au>=CS_MAXREADER))
+    return;
+  client[cs_idx].lastemm=time((time_t)0);
+  cs_debug_mask(D_EMM,"reader %s has serial %s.", reader[au].label, cs_hexdump(0, reader[au].hexserial, 8));
+  cs_ddump_mask(D_EMM, ep->hexserial, 8, "emm UA:");
+  cs_ddump_mask(D_EMM, ep->emm, ep->l, "emm:");
+//  if ((!reader[au].fd) || (reader[au].b_nano[ep->emm[3]])) // blocknano is obsolete
+  if ((!reader[au].fd) ||       // reader has no fd
+      (reader[au].caid[0]!=b2i(2,ep->caid)) ||    // wrong caid
+      (memcmp(reader[au].hexserial, ep->hexserial, 8))) /* wrong serial*/  {
 #ifdef WEBIF
 	  client[cs_idx].emmnok++;
 #endif
 	  return;
-	}
+  }
 #ifdef WEBIF
-	client[cs_idx].emmok++;
+  client[cs_idx].emmok++;
 #endif
-	ep->cidx = cs_idx;
-	cs_debug_mask(D_EMM, "emm is being sent to reader %s.", reader[au].label);
-	write_to_pipe(reader[au].fd, PIP_ID_EMM, (uchar *) ep, sizeof(EMM_PACKET));
+  ep->cidx=cs_idx;
+  write_to_pipe(reader[au].fd, PIP_ID_EMM, (uchar *) ep, sizeof(EMM_PACKET));
 }
 
 static int comp_timeb(struct timeb *tpa, struct timeb *tpb)

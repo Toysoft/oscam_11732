@@ -718,32 +718,6 @@ int nagra2_do_ecm(ECM_REQUEST *er)
 	return ERROR;
 }
 
-int nagra2_get_emm_type(EMM_PACKET *ep, struct s_reader * rdr) //returns TRUE if shared emm matches SA, unique emm matches serial, or global or unknown
-{
-  switch (ep->emm[0]) {
-		case 0x83:
-			memset(ep->hexserial,0,8);
-			ep->hexserial[0] = ep->emm[5];
-			ep->hexserial[1] = ep->emm[4];
-			ep->hexserial[2] = ep->emm[3];
-			if (ep->emm[7] == 0x10) {
-				ep->type = SHARED;
-				return (!memcmp (rdr->hexserial+2, ep->hexserial, 3));
-			}
-			else {
-				ep->hexserial[3] = ep->emm[6];
-				ep->type = UNIQUE;
-				return (!memcmp (rdr->hexserial+2, ep->hexserial, 4));
-			}
-		case 0x82:
-			ep->type = GLOBAL;
-			return TRUE;
-		default:
-			ep->type = UNKNOWN;
-			return TRUE;
-	}
-}
-
 int nagra2_do_emm(EMM_PACKET *ep)
 {
 	if (!is_tiger)

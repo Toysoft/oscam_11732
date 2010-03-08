@@ -365,47 +365,6 @@ int irdeto_do_ecm(ECM_REQUEST *er)
   return OK;
 }
 
-int irdeto_get_emm_type(EMM_PACKET *ep, struct s_reader * rdr) {
-
-	int l = (ep->emm[3]&0x07);
-	int mode = (ep->emm[3]>>3);
-	char dumprdrserial[l*3];
-
-	cs_debug_mask(D_EMM, "Entered irdeto_get_emm_type ep->emm[3]=%02x",ep->emm[3]);
-
-	switch (ep->emm[3]) {
-
-		case 0x00:
-		case 0xd0:
-			// 0xd0/0x00 means global emm
-			ep->type = GLOBAL;
-			cs_debug_mask(D_EMM, "IRDETO EMM: GLOBAL");
-			return TRUE;
-		case 0xd2:
-			// 0xd2 means shared emm, first 2 bytes of hexserial are transmitted in emm, seems to be the shared adr
-			ep->type = SHARED;
-			memset(ep->hexserial, 0, 8);
-			memcpy(ep->hexserial, ep->emm + 4, l);
-			strcpy(dumprdrserial, cs_hexdump(1, rdr->hexserial, l));
-			cs_debug_mask(D_EMM, "IRDETO EMM: SHARED, l = %d, ep = %s , rdr = %s", l, cs_hexdump(1, ep->hexserial, l), dumprdrserial);
-			return (!l || !memcmp(ep->emm + 4, rdr->hexserial, l));
-			
-		case 0xd3:
-			// 0xd3 means uniqe emm
-			ep->type = UNIQUE;
-			memset(ep->hexserial, 0, 8);
-			memcpy(ep->hexserial, ep->emm + 4, l);
-			strcpy(dumprdrserial, cs_hexdump(1, rdr->hexserial, l));
-			cs_debug_mask(D_EMM, "IRDETO EMM: UNIQUE, l = %d, ep = %s , rdr = %s", l, cs_hexdump(1, ep->hexserial, l), dumprdrserial);
-			return (mode == rdr->hexserial[3] && (!l || !memcmp(ep->emm + 4, rdr->hexserial, l)));
-		default:
-			ep->type = UNKNOWN;
-			cs_debug_mask(D_EMM, "IRDETO EMM: UNKNOWN");
-			return TRUE;
-	}
-
-}
-
 int irdeto_do_emm(EMM_PACKET *ep)
 {
   static const uchar sc_EmmCmd[] = { 0x01,0x00,0x00,0x00,0x00 };
@@ -415,6 +374,7 @@ int irdeto_do_emm(EMM_PACKET *ep)
   int mode=(ep->emm[3]>>3);
 
   uchar *emm=ep->emm;
+  ep->type=emm[3];
   if (mode&0x10)		// Hex addressed
   {
     ok=(mode==reader[ridx].hexserial[3] &&

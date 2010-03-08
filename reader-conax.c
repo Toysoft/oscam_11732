@@ -203,42 +203,6 @@ int conax_do_ecm(ECM_REQUEST *er)
 	 return ERROR;
 }
 
-int conax_get_emm_type(EMM_PACKET *ep, struct s_reader * rdr) //returns TRUE if shared emm matches SA, unique emm matches serial, or global or unknown
-{
-	int i, ok = 0;
-
-	cs_debug_mask(D_EMM, "Entered conax_get_emm_type ep->emm[2]=%02x",ep->emm[2]);
-
-	for (i = 0; i < rdr->nprov; i++) {
-		ok = (!memcmp(&ep->emm[6], rdr->sa[i], 4));
-		if (ok) break;
-	}
-
-	if (ok) {
-		ep->type = SHARED;
-		memset(ep->hexserial, 0, 8);
-		memcpy(ep->hexserial, &ep->emm[6], 4);
-		cs_debug_mask(D_EMM, "CONAX EMM: SHARED, ep->hexserial = %s", cs_hexdump(1, ep->hexserial, 8));
-		return TRUE;
-	}
-	else {
-		if (!memcmp(&ep->emm[4], rdr->hexserial, 6)) {
-			ep->type = UNIQUE;
-			memset(ep->hexserial, 0, 8);
-			memcpy(ep->hexserial, &ep->emm[4], 6);
-			cs_debug_mask(D_EMM, "CONAX EMM: UNIQUE, ep->hexserial = %s", cs_hexdump(1, ep->hexserial, 8));
-			return TRUE;
-		}
-		else {
-			ep->type = GLOBAL;
-			cs_debug_mask(D_EMM, "CONAX EMM: GLOBAL");
-			memset(ep->hexserial, 0, 8);
-			return TRUE;
-		}
-	}
-}
-	
-
 int conax_do_emm(EMM_PACKET *ep)
 {
   /* by KrazyIvan
@@ -253,6 +217,7 @@ int conax_do_emm(EMM_PACKET *ep)
   int rc=0;
 
   int l=ep->emm[2];
+  ep->type=l+3;
 
   insEMM[4]=l+5;
   buf[0]=0x12;
